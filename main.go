@@ -20,7 +20,7 @@ var publicIpService = "https://httpbin.org/ip"
 
 func main() {
 	// Get environment variables
-	hostedZoneId := os.Getenv("AWS_HOSTED_ZONE_ID");
+	hostedZoneId := os.Getenv("AWS_HOSTED_ZONE_ID")
 	if hostedZoneId == "" {
 		panic("missing AWS_HOSTED_ZONE_ID environment variable")
 	}
@@ -42,7 +42,7 @@ func main() {
 		panic(err)
 	}
 	// Check if multiple comma separated IP addresses are returned
-	// if so, return first element 
+	// if so, return first element
 	var publicIp string = dat["origin"].(string)
 	if strings.Contains(publicIp, ",") {
 		publicIp = strings.Split(publicIp, ",")[0]
@@ -57,7 +57,7 @@ func main() {
 	svc := route53.New(AwsSession)
 	// Find ListResourceRecordSets
 	//recordSets = svc.ListResourceRecordSets()
-	// Check if IP already exists 
+	// Check if IP already exists
 	fmt.Println(svc)
 	fmt.Println(hostedZoneId)
 	return
