@@ -54,11 +54,6 @@ func main() {
 		publicIp = strings.Split(publicIp, ",")[0]
 	}
 	fmt.Println(publicIp)
-	// define aws sdk session
-	//AwsSession, err := session.NewSession()
-	//if err != nil {
-	//	panic(err)
-	//}
 	// Create route53 service
 	svc := route53.New(session.New())
 	input := &route53.GetHostedZoneInput{
@@ -82,7 +77,7 @@ func main() {
 		}
 	}
 	if strings.Contains(*result.HostedZone.Name, domainIdEnv) {
-		fmt.Println("herre!")
+		fmt.Println("herre!!")
 	}
 
 	// Find ListResourceRecordSets

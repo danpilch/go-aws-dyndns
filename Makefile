@@ -11,13 +11,16 @@
     
     all: test build
     build: 
+		$(GOBUILD) fmt
 		$(GOBUILD) -o $(BINARY_NAME) -v
     test: 
+		$(GOBUILD) fmt
 		$(GOTEST) -v ./...
     clean: 
 		$(GOCLEAN)
 		rm -rf $(BINARY_PATH)
     run:
+		$(GOBUILD) fmt
 		$(GOBUILD) -o $(BINARY_NAME) -v ./...
 		./$(BINARY_NAME)
     deps:
