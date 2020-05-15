@@ -26,6 +26,10 @@ func main() {
 	if hostedZoneIdEnv == "" {
 		panic("missing AWS_HOSTED_ZONE_ID environment variable")
 	}
+	hostedDomainFqdn := os.Getenv("AWS_HOSTED_DOMAIN_FQDN")
+	if hostedDomainFqdn == "" {
+		panic("missing AWS_HOSTED_DOMAIN_FQDN environment variable")
+	}
 	domainIdEnv := os.Getenv("AWS_HOSTED_ZONE_DOMAIN_NAME")
 	if domainIdEnv == "" {
 		panic("missing AWS_HOSTED_ZONE_DOMAIN_NAME environment variable")
@@ -76,9 +80,31 @@ func main() {
 			fmt.Println(err.Error())
 		}
 	}
+    // Check if domainIdEnv is found in HostedZone
 	if strings.Contains(*result.HostedZone.Name, domainIdEnv) {
-		fmt.Println("herre!!")
+        fmt.Printf("found hosted zone: %s\n", domainIdEnv)
+        fmt.Println(result)
+	} else {
+        panic("cannot find domain")
+    }
+    // Build HostedZoneInput
+	params := &route53.ListResourceRecordSetsInput{
+		HostedZoneId: aws.String(*result.HostedZone.Id),
+        StartRecordName: aws.String(hostedDomainFqdn),
+        StartRecordType: aws.String("A"),
 	}
+    // Example iterating over at most 3 pages of a ListResourceRecordSets operation.
+    pageNum := 0
+    if err := svc.ListResourceRecordSetsPages(params,
+        func(page *route53.ListResourceRecordSetsOutput, lastPage bool) bool {
+            pageNum++
+            fmt.Println(page)
+            return pageNum <= 3
+        }); err != nil {
+            panic(err)
+        }
+
+
 
 	// Find ListResourceRecordSets
 	//recordSets = svc.ListResourceRecordSets()
