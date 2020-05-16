@@ -57,7 +57,7 @@ func main() {
 	if strings.Contains(publicIp, ",") {
 		publicIp = strings.Split(publicIp, ",")[0]
 	}
-	fmt.Println(publicIp)
+    fmt.Println("current public ip:", publicIp)
 	// Create route53 service
 	svc := route53.New(session.New())
 	input := &route53.GetHostedZoneInput{
@@ -83,7 +83,6 @@ func main() {
     // Check if domainIdEnv is found in HostedZone
 	if strings.Contains(*result.HostedZone.Name, domainIdEnv) {
         fmt.Printf("found hosted zone: %s\n", domainIdEnv)
-        fmt.Println(result)
 	} else {
         panic("cannot find domain")
     }
@@ -93,21 +92,14 @@ func main() {
         StartRecordName: aws.String(hostedDomainFqdn),
         StartRecordType: aws.String("A"),
 	}
-    // Example iterating over at most 3 pages of a ListResourceRecordSets operation.
-    pageNum := 0
-    if err := svc.ListResourceRecordSetsPages(params,
-        func(page *route53.ListResourceRecordSetsOutput, lastPage bool) bool {
-            pageNum++
-            fmt.Println(page)
-            return pageNum <= 3
-        }); err != nil {
-            panic(err)
-        }
-
-
-
-	// Find ListResourceRecordSets
-	//recordSets = svc.ListResourceRecordSets()
-	// Check if IP already exists
+    // List recordsets
+    recordsets, err := svc.ListResourceRecordSets(params)
+    if len(recordsets.ResourceRecordSets) == 0 {
+        panic("no records found")
+    }
+	// Check if IP is current if not, update
+    if *recordsets.ResourceRecordSets[0].ResourceRecords[0].Value != publicIp {
+        fmt.Println("updating ip")
+    }
 	return
 }
