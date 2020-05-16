@@ -17,7 +17,7 @@ import (
 	"strings"
 )
 
-var publicIpService = "https://httpbin.org/ip"
+var currentPublicIpService = "https://httpbin.org/ip"
 
 func main() {
 	// Get environment variables
@@ -36,7 +36,7 @@ func main() {
 	}
 
 	// Make https request to get public IP
-	resp, err := http.Get(publicIpService)
+	resp, err := http.Get(currentPublicIpService)
 	if err != nil {
 		panic(err)
 	}
@@ -53,17 +53,17 @@ func main() {
 	}
 	// Check if multiple comma separated IP addresses are returned
 	// if so, return first element
-	var publicIp string = dat["origin"].(string)
-	if strings.Contains(publicIp, ",") {
-		publicIp = strings.Split(publicIp, ",")[0]
+	var currentPublicIp string = dat["origin"].(string)
+	if strings.Contains(currentPublicIp, ",") {
+		currentPublicIp = strings.Split(currentPublicIp, ",")[0]
 	}
-    fmt.Println("current public ip:", publicIp)
+	fmt.Println("current public ip:", currentPublicIp)
 	// Create route53 service
 	svc := route53.New(session.New())
-	input := &route53.GetHostedZoneInput{
+	// Get the hosted zone
+	HostedZoneResult, err := svc.GetHostedZone(&route53.GetHostedZoneInput{
 		Id: aws.String(hostedZoneIdEnv),
-	}
-	result, err := svc.GetHostedZone(input)
+	})
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
@@ -80,26 +80,60 @@ func main() {
 			fmt.Println(err.Error())
 		}
 	}
-    // Check if domainIdEnv is found in HostedZone
-	if strings.Contains(*result.HostedZone.Name, domainIdEnv) {
-        fmt.Printf("found hosted zone: %s\n", domainIdEnv)
+	// Check if domainIdEnv is found in HostedZone
+	if strings.Contains(*HostedZoneResult.HostedZone.Name, domainIdEnv) {
+		fmt.Printf("found hosted zone: %s\n", domainIdEnv)
 	} else {
-        panic("cannot find domain")
-    }
-    // Build HostedZoneInput
-	params := &route53.ListResourceRecordSetsInput{
-		HostedZoneId: aws.String(*result.HostedZone.Id),
-        StartRecordName: aws.String(hostedDomainFqdn),
-        StartRecordType: aws.String("A"),
+		panic("cannot find domain")
 	}
-    // List recordsets
-    recordsets, err := svc.ListResourceRecordSets(params)
-    if len(recordsets.ResourceRecordSets) == 0 {
-        panic("no records found")
-    }
+	// Build HostedZoneInput
+	params := &route53.ListResourceRecordSetsInput{
+		HostedZoneId:    aws.String(*HostedZoneResult.HostedZone.Id),
+		StartRecordName: aws.String(hostedDomainFqdn),
+		StartRecordType: aws.String("A"),
+	}
+	// List recordsets
+	recordsets, err := svc.ListResourceRecordSets(params)
+	if len(recordsets.ResourceRecordSets) == 0 {
+		panic("no records found")
+	}
 	// Check if IP is current if not, update
-    if *recordsets.ResourceRecordSets[0].ResourceRecords[0].Value != publicIp {
-        fmt.Println("updating ip")
+	if *recordsets.ResourceRecordSets[0].ResourceRecords[0].Value != currentPublicIp {
+		fmt.Println("updating ip")
+        // Build change record
+		changeRecordParams := &route53.ChangeResourceRecordSetsInput{
+			ChangeBatch: &route53.ChangeBatch{
+				Changes: []*route53.Change{
+					{
+						Action: aws.String("UPSERT"),
+						ResourceRecordSet: &route53.ResourceRecordSet{
+							Name: aws.String(hostedDomainFqdn),
+							Type: aws.String("A"),
+							ResourceRecords: []*route53.ResourceRecord{
+								{
+									Value: aws.String(currentPublicIp),
+								},
+							},
+							TTL: aws.Int64(60),
+						},
+					},
+				},
+				Comment: aws.String("dyndns update"),
+			},
+			HostedZoneId: aws.String(*HostedZoneResult.HostedZone.Id),
+		}
+        // Apply record set change
+        resp, err := svc.ChangeResourceRecordSets(changeRecordParams)
+        if err != nil {
+            fmt.Println(err.Error())
+            return
+        }
+        // Output change response
+        fmt.Println(resp)
+        fmt.Println("change complete")
+    } else {
+        // Change not required
+        fmt.Println("no update required")
     }
 	return
 }
